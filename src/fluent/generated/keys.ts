@@ -5,9 +5,73 @@ declare global {
         namespace Internal {
             interface Keys extends KeysRegistry {
                 explicit: {
+                    agri_app_menu: {
+                        table: 'sys_app_application'
+                        id: '8917155ff1cd4ad8ad151a0a40919b67'
+                    }
                     agri_machinery_dashboard: {
                         table: 'par_dashboard'
                         id: '2709774e94b64a748b9857f1d12192ee'
+                    }
+                    agri_menu_category: {
+                        table: 'sys_app_category'
+                        id: '8be030c528444f16a79ec2fd5f88bd9d'
+                    }
+                    agri_module_all_requests: {
+                        table: 'sys_app_module'
+                        id: '9551d0ce3a194f27bc86b666ed7473be'
+                    }
+                    agri_module_browse_machinery: {
+                        table: 'sys_app_module'
+                        id: '4e280fade95144c0a5b2785625152b66'
+                    }
+                    agri_module_farmers_list: {
+                        table: 'sys_app_module'
+                        id: '8c180acb833a41438d39c8bd68350d26'
+                    }
+                    agri_module_machinery_list: {
+                        table: 'sys_app_module'
+                        id: 'd4d520ea19b8460e925334858f2fa0f5'
+                    }
+                    agri_module_my_requests: {
+                        table: 'sys_app_module'
+                        id: '0b4c6aefa6924b2888621b6a36d8095e'
+                    }
+                    agri_module_new_farmer: {
+                        table: 'sys_app_module'
+                        id: '9b18f205e45a4a088bdc201b032eedee'
+                    }
+                    agri_module_new_machinery: {
+                        table: 'sys_app_module'
+                        id: '29d744ca5f8a4e4f9d45d5430a3e4a51'
+                    }
+                    agri_module_new_request_admin: {
+                        table: 'sys_app_module'
+                        id: 'c2e4f6e3822b4d8fac13ab3331aaab5a'
+                    }
+                    agri_module_pending_requests: {
+                        table: 'sys_app_module'
+                        id: 'b8b339f0c9c840f69c91f9b862fd3c81'
+                    }
+                    agri_module_sep_admin: {
+                        table: 'sys_app_module'
+                        id: '8e26ed169a0e4f5eac6c66fade36198f'
+                    }
+                    agri_module_sep_farmer: {
+                        table: 'sys_app_module'
+                        id: '64c18739fb4a418488800d6bf1b39512'
+                    }
+                    agri_module_sep_farmers: {
+                        table: 'sys_app_module'
+                        id: 'b67cf6fc3ad4471691d484930cf94b76'
+                    }
+                    agri_module_sep_machinery: {
+                        table: 'sys_app_module'
+                        id: 'c36ebc5f71344f88bded6203a0c1bf73'
+                    }
+                    agri_module_submit_request: {
+                        table: 'sys_app_module'
+                        id: '164c3fa65717482c9335ad2486ccd6c4'
                     }
                     availability_check: {
                         table: 'sys_script'

@@ -40,3 +40,6 @@ export * from './dashboard/agri-dashboard.now'
 
 // ── Scheduled Scripts ─────────────────────────────────────────────────────────
 export * from './scheduled-scripts/seed-machinery-catalog.now'
+
+// ── Navigator Menu ────────────────────────────────────────────────────────────
+export * from './navigator/app-menu.now'
