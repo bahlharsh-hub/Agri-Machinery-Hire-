@@ -24,6 +24,7 @@ export * from './roles/roles.now'
 // ── Business Rules ────────────────────────────────────────────────────────────
 export * from './business-rules/availability-check.now'
 export * from './business-rules/drone-image-trigger.now'
+import './business-rules/drone-analysis-on-upload.now'
 
 // ── Script Includes ───────────────────────────────────────────────────────────
 export * from './script-includes/drone-analysis-util.now'

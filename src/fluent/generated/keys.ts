@@ -89,6 +89,10 @@ declare global {
                         table: 'par_dashboard_tab'
                         id: '7aa1639c86e1461cb7efc9a295bd7cef'
                     }
+                    drone_analysis_on_upload: {
+                        table: 'sys_script'
+                        id: '13d575688dc348feb835c34b466fcc97'
+                    }
                     drone_analysis_util: {
                         table: 'sys_script_include'
                         id: '8c60dda567724df8871a244e25671757'
@@ -176,6 +180,10 @@ declare global {
                     'src_server_business-rules_availability-check_server_js': {
                         table: 'sys_module'
                         id: 'b8790a3eb6bb47b794608dfe01c8afec'
+                    }
+                    'src_server_business-rules_drone-analysis-on-upload_server_js': {
+                        table: 'sys_module'
+                        id: '8c3d0a5879b64998b90cc94661c7a161'
                     }
                     'src_server_business-rules_drone-image-trigger_server_js': {
                         table: 'sys_module'
@@ -515,6 +523,7 @@ declare global {
                     {
                         table: 'sys_choice'
                         id: '4477a47ba3fe45a497ee0a2bff5aea32'
+                        deleted: true
                         key: {
                             name: 'x_agri_hire_hire_request'
                             element: 'drone_image_analyzed'
@@ -650,6 +659,15 @@ declare global {
                         key: {
                             name: 'x_agri_hire_machinery_catalog'
                             element: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '5f69be5869d24daf96fe5fd16c09e4d3'
+                        key: {
+                            name: 'x_agri_hire_hire_request'
+                            element: 'drone_image_analyzed'
+                            value: 'uploaded'
                         }
                     },
                     {
@@ -1063,6 +1081,15 @@ declare global {
                             name: 'x_agri_hire_machinery_catalog'
                             element: 'name'
                             value: 'rotavator'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'b5cbf03926b741a4afd4d3cc7daaf5d3'
+                        key: {
+                            name: 'x_agri_hire_hire_request'
+                            element: 'drone_image_analyzed'
+                            value: 'processing'
                         }
                     },
                     {

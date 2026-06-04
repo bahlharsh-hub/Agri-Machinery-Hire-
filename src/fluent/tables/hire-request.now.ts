@@ -94,7 +94,8 @@ export const x_agri_hire_hire_request = Table({
             default: 'not_uploaded',
             choices: {
                 not_uploaded: 'Not Uploaded',
-                pending: 'Analysis Pending',
+                uploaded: 'Uploaded',
+                processing: 'Processing',
                 completed: 'Analysis Completed',
                 failed: 'Analysis Failed',
             },

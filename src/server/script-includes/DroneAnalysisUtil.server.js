@@ -1,11 +1,20 @@
 /**
  * Script Include: DroneAnalysisUtil
- * Sends a drone-captured image (as base64) to the Claude AI Vision API
- * and parses the structured field health report back into the hire request record.
  *
- * Usage (from a business rule or UI action):
- *   var util = new DroneAnalysisUtil();
- *   util.analyzeImage(hireRequestSysId, attachmentSysId);
+ * Calls the Claude API (claude-sonnet-4-20250514) with a drone image attachment
+ * to analyse field health and write a structured report back to the Hire Request.
+ *
+ * Fields populated on x_agri_hire_hire_request:
+ *   - crop_health_assessment
+ *   - irrigation_areas       (areas needing irrigation)
+ *   - fertilizer_areas       (areas needing fertilizer)
+ *   - pest_detection         (pest / disease detection)
+ *   - health_score           (field health score 0-10)
+ *   - field_health_report    (full narrative report)
+ *   - drone_image_analyzed   → 'completed' | 'failed'
+ *
+ * Required system property:
+ *   x_agri_hire.claude_api_key  (Type: password2) — your Anthropic API key
  */
 
 var DroneAnalysisUtil = Class.create();
@@ -13,121 +22,95 @@ var DroneAnalysisUtil = Class.create();
 DroneAnalysisUtil.prototype = {
 
     initialize: function () {
-        // Claude API configuration — store your key in a System Property:
-        // Name: x_agri_hire.claude_api_key  |  Type: password2
         this.CLAUDE_API_KEY = gs.getProperty('x_agri_hire.claude_api_key', '');
-        this.CLAUDE_MODEL = gs.getProperty(
-            'x_agri_hire.claude_model',
-            'claude-opus-4-5'
-        );
+        this.CLAUDE_MODEL   = 'claude-sonnet-4-20250514';
         this.CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
-        this.MAX_TOKENS = 1500;
+        this.MAX_TOKENS     = 1500;
     },
 
     /**
      * Main entry point.
-     * @param {string} hireRequestSysId - sys_id of the x_agri_hire_hire_request record
-     * @param {string} attachmentSysId  - sys_id of the sys_attachment record (drone image)
+     * @param {string} hireRequestSysId - sys_id of the hire request record
+     * @param {string} attachmentSysId  - sys_id of the drone image attachment
      */
     analyzeImage: function (hireRequestSysId, attachmentSysId) {
         try {
             if (!this.CLAUDE_API_KEY) {
-                gs.addErrorMessage(
-                    'Claude API key not configured. Set system property: x_agri_hire.claude_api_key'
-                );
-                this._updateStatus(hireRequestSysId, 'failed');
+                gs.error('DroneAnalysisUtil: Claude API key not set. Add system property: x_agri_hire.claude_api_key');
+                this._setStatus(hireRequestSysId, 'failed');
                 return false;
             }
 
-            // Fetch attachment as base64
-            var base64Image = this._getAttachmentBase64(attachmentSysId);
+            this._setStatus(hireRequestSysId, 'processing');
+
+            var base64Image = this._getBase64(attachmentSysId);
             if (!base64Image) {
-                gs.addErrorMessage('Could not read attachment. Please ensure the file is a valid image.');
-                this._updateStatus(hireRequestSysId, 'failed');
+                gs.error('DroneAnalysisUtil: Could not read attachment ' + attachmentSysId);
+                this._setStatus(hireRequestSysId, 'failed');
                 return false;
             }
 
             var mediaType = this._getMediaType(attachmentSysId);
+            var rawResponse = this._callClaude(base64Image, mediaType);
 
-            // Build the Claude Vision API prompt
-            var prompt = this._buildPrompt();
-
-            // Call Claude API
-            var response = this._callClaudeAPI(base64Image, mediaType, prompt);
-            if (!response) {
-                this._updateStatus(hireRequestSysId, 'failed');
+            if (!rawResponse) {
+                this._setStatus(hireRequestSysId, 'failed');
                 return false;
             }
 
-            // Parse and save the report
-            this._saveReport(hireRequestSysId, response);
+            this._saveReport(hireRequestSysId, rawResponse);
             return true;
 
         } catch (e) {
-            gs.error('DroneAnalysisUtil.analyzeImage error: ' + e.message);
-            this._updateStatus(hireRequestSysId, 'failed');
+            gs.error('DroneAnalysisUtil.analyzeImage: ' + e.message);
+            this._setStatus(hireRequestSysId, 'failed');
             return false;
         }
     },
 
-    /**
-     * Reads a sys_attachment record and returns its content as a base64 string.
-     */
-    _getAttachmentBase64: function (attachmentSysId) {
+    // ── Private helpers ────────────────────────────────────────────────────────
+
+    _getBase64: function (attachmentSysId) {
         try {
             var sa = new GlideSysAttachment();
-            var attachGr = new GlideRecord('sys_attachment');
-            if (!attachGr.get(attachmentSysId)) {
-                return null;
-            }
-            var bytes = sa.getBytes(attachGr);
-            if (!bytes) return null;
-            return GlideStringUtil.base64Encode(bytes);
+            var gr = new GlideRecord('sys_attachment');
+            if (!gr.get(attachmentSysId)) return null;
+            var bytes = sa.getBytes(gr);
+            return bytes ? GlideStringUtil.base64Encode(bytes) : null;
         } catch (e) {
-            gs.error('DroneAnalysisUtil._getAttachmentBase64 error: ' + e.message);
+            gs.error('DroneAnalysisUtil._getBase64: ' + e.message);
             return null;
         }
     },
 
-    /**
-     * Determines the media type (MIME) from the attachment record.
-     */
     _getMediaType: function (attachmentSysId) {
-        var attachGr = new GlideRecord('sys_attachment');
-        if (attachGr.get(attachmentSysId)) {
-            var ct = attachGr.getValue('content_type') || 'image/jpeg';
-            // Normalise to Claude-accepted types
-            if (ct.indexOf('png') !== -1) return 'image/png';
-            if (ct.indexOf('gif') !== -1) return 'image/gif';
+        var gr = new GlideRecord('sys_attachment');
+        if (gr.get(attachmentSysId)) {
+            var ct = gr.getValue('content_type') || 'image/jpeg';
+            if (ct.indexOf('png')  !== -1) return 'image/png';
+            if (ct.indexOf('gif')  !== -1) return 'image/gif';
             if (ct.indexOf('webp') !== -1) return 'image/webp';
-            return 'image/jpeg';
         }
         return 'image/jpeg';
     },
 
-    /**
-     * Builds the structured analysis prompt sent to Claude.
-     */
     _buildPrompt: function () {
         return (
-            'You are an expert agricultural field analyst. ' +
-            'Analyse this drone-captured field image and produce a structured JSON report. ' +
-            'Return ONLY a valid JSON object (no markdown fences, no extra text) with these exact keys:\n\n' +
+            'You are an expert agricultural field analyst reviewing a drone-captured field image. ' +
+            'Analyse the image carefully and return ONLY a valid JSON object — no markdown fences, ' +
+            'no extra commentary — with exactly these keys:\n\n' +
             '{\n' +
-            '  "crop_health_assessment": "<string: overall crop condition, color, density>",\n' +
-            '  "irrigation_areas": "<string: describe zones that appear water-stressed or need irrigation>",\n' +
-            '  "fertilizer_areas": "<string: describe zones showing nutrient deficiency or needing fertilizer>",\n' +
-            '  "pest_detection": "<string: any visible pest damage, disease patches, or anomalies. Say None if not detected.>",\n' +
-            '  "health_score": <integer 1-10: overall field health where 10 is perfect>,\n' +
-            '  "summary": "<string: 2-3 sentence executive summary for the farmer>"\n' +
+            '  "crop_health_assessment": "<string: describe overall crop health, colour, density, uniformity>",\n' +
+            '  "areas_needing_irrigation": "<string: identify zones that appear dry or water-stressed>",\n' +
+            '  "areas_needing_fertilizer": "<string: describe zones showing nutrient deficiency or pale patches>",\n' +
+            '  "pest_disease_detection": "<string: describe any visible pest damage or disease patterns; say None if not detected>",\n' +
+            '  "field_health_score": <integer 0-10: 10 = excellent, 0 = severely damaged>,\n' +
+            '  "field_health_report": "<string: 3-4 sentence executive summary and recommended actions for the farmer>"\n' +
             '}'
         );
     },
 
-    /**
-     * Calls the Anthropic Claude Messages API with a vision (image) payload.
-     */
-    _callClaudeAPI: function (base64Image, mediaType, prompt) {
+    _callClaude: function (base64Image, mediaType) {
         try {
             var rm = new sn_ws.RESTMessageV2();
             rm.setEndpoint(this.CLAUDE_API_URL);
@@ -135,106 +118,88 @@ DroneAnalysisUtil.prototype = {
             rm.setRequestHeader('x-api-key', this.CLAUDE_API_KEY);
             rm.setRequestHeader('anthropic-version', '2023-06-01');
             rm.setRequestHeader('content-type', 'application/json');
+            rm.setHttpTimeout(60000);
 
             var body = {
                 model: this.CLAUDE_MODEL,
                 max_tokens: this.MAX_TOKENS,
-                messages: [
-                    {
-                        role: 'user',
-                        content: [
-                            {
-                                type: 'image',
-                                source: {
-                                    type: 'base64',
-                                    media_type: mediaType,
-                                    data: base64Image,
-                                },
-                            },
-                            {
-                                type: 'text',
-                                text: prompt,
-                            },
-                        ],
-                    },
-                ],
+                messages: [{
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'image',
+                            source: {
+                                type: 'base64',
+                                media_type: mediaType,
+                                data: base64Image
+                            }
+                        },
+                        {
+                            type: 'text',
+                            text: this._buildPrompt()
+                        }
+                    ]
+                }]
             };
 
             rm.setRequestBody(JSON.stringify(body));
-            rm.setHttpTimeout(60000); // 60-second timeout for vision calls
-
             var response = rm.execute();
-            var statusCode = response.getStatusCode();
+            var status   = response.getStatusCode();
 
-            if (statusCode !== 200) {
-                gs.error(
-                    'DroneAnalysisUtil: Claude API returned status ' +
-                        statusCode +
-                        ' — ' +
-                        response.getBody()
-                );
+            if (status !== 200) {
+                gs.error('DroneAnalysisUtil: Claude API returned HTTP ' + status + ' — ' + response.getBody());
                 return null;
             }
 
-            var responseBody = JSON.parse(response.getBody());
-            if (
-                responseBody &&
-                responseBody.content &&
-                responseBody.content.length > 0
-            ) {
-                return responseBody.content[0].text;
+            var parsed = JSON.parse(response.getBody());
+            if (parsed && parsed.content && parsed.content.length > 0) {
+                return parsed.content[0].text;
             }
             return null;
 
         } catch (e) {
-            gs.error('DroneAnalysisUtil._callClaudeAPI error: ' + e.message);
+            gs.error('DroneAnalysisUtil._callClaude: ' + e.message);
             return null;
         }
     },
 
-    /**
-     * Parses the JSON response from Claude and persists it to the hire request.
-     */
-    _saveReport: function (hireRequestSysId, rawResponse) {
-        var hireGr = new GlideRecord('x_agri_hire_hire_request');
-        if (!hireGr.get(hireRequestSysId)) {
-            gs.error('DroneAnalysisUtil: Hire request not found — ' + hireRequestSysId);
+    _saveReport: function (hireRequestSysId, rawText) {
+        var gr = new GlideRecord('x_agri_hire_hire_request');
+        if (!gr.get(hireRequestSysId)) {
+            gs.error('DroneAnalysisUtil._saveReport: Hire request not found — ' + hireRequestSysId);
             return;
         }
 
         try {
-            var report = JSON.parse(rawResponse);
+            var report = JSON.parse(rawText);
 
-            hireGr.setValue('crop_health_assessment', report.crop_health_assessment || 'N/A');
-            hireGr.setValue('irrigation_areas', report.irrigation_areas || 'N/A');
-            hireGr.setValue('fertilizer_areas', report.fertilizer_areas || 'N/A');
-            hireGr.setValue('pest_detection', report.pest_detection || 'None detected');
-            hireGr.setValue('health_score', parseInt(report.health_score) || 0);
-            hireGr.setValue('field_health_report', report.summary || rawResponse);
-            hireGr.setValue('drone_image_analyzed', 'completed');
+            gr.setValue('crop_health_assessment', report.crop_health_assessment   || 'N/A');
+            gr.setValue('irrigation_areas',       report.areas_needing_irrigation  || 'N/A');
+            gr.setValue('fertilizer_areas',       report.areas_needing_fertilizer  || 'N/A');
+            gr.setValue('pest_detection',         report.pest_disease_detection    || 'None detected');
+            gr.setValue('health_score',           parseInt(report.field_health_score) || 0);
+            gr.setValue('field_health_report',    report.field_health_report       || rawText);
+            gr.setValue('drone_image_analyzed',   'completed');
+            gr.update();
 
-            hireGr.update();
-            gs.addInfoMessage('Drone field health analysis completed successfully.');
+            gs.info('DroneAnalysisUtil: Field health analysis completed for request ' + hireRequestSysId);
 
         } catch (e) {
-            // If Claude returned non-JSON text, store it as a raw report
-            gs.warn('DroneAnalysisUtil: Could not parse JSON response. Storing raw report.');
-            hireGr.setValue('field_health_report', rawResponse);
-            hireGr.setValue('drone_image_analyzed', 'completed');
-            hireGr.update();
+            // Claude returned non-JSON — store raw text as the report
+            gs.warn('DroneAnalysisUtil._saveReport: JSON parse failed, storing raw response.');
+            gr.setValue('field_health_report',  rawText);
+            gr.setValue('drone_image_analyzed', 'completed');
+            gr.update();
         }
     },
 
-    /**
-     * Updates the drone_image_analyzed status field on the hire request.
-     */
-    _updateStatus: function (hireRequestSysId, status) {
-        var hireGr = new GlideRecord('x_agri_hire_hire_request');
-        if (hireGr.get(hireRequestSysId)) {
-            hireGr.setValue('drone_image_analyzed', status);
-            hireGr.update();
+    _setStatus: function (hireRequestSysId, status) {
+        var gr = new GlideRecord('x_agri_hire_hire_request');
+        if (gr.get(hireRequestSysId)) {
+            gr.setValue('drone_image_analyzed', status);
+            gr.update();
         }
     },
 
-    type: 'DroneAnalysisUtil',
+    type: 'DroneAnalysisUtil'
 };
