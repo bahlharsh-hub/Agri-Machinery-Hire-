@@ -1,4 +1,4 @@
-import { Table, StringColumn, IntegerColumn, DateColumn, ReferenceColumn, ChoiceColumn } from '@servicenow/sdk/core'
+import { Table, StringColumn, IntegerColumn, DateColumn, DateTimeColumn, ReferenceColumn, ChoiceColumn } from '@servicenow/sdk/core'
 
 /**
  * Hire Request Table
@@ -99,6 +99,13 @@ export const x_agri_hire_hire_request = Table({
                 completed:    { label: 'Analysis Completed' },
                 failed:       { label: 'Analysis Failed' },
             },
+        }),
+        drone_image_attachment_id: StringColumn({
+            label: 'Drone Image Attachment ID',
+            maxLength: 32,
+        }),
+        drone_analysis_timestamp: DateTimeColumn({
+            label: 'Drone Analysis Timestamp',
         }),
         notes: StringColumn({
             label: 'Additional Notes',
