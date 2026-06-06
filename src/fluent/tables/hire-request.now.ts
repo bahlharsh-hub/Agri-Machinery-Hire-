@@ -27,7 +27,7 @@ export const x_agri_hire_hire_request = Table({
             maxLength: 100,
         }),
         farmer_email: StringColumn({
-            label: 'Farmer Email',
+            label: 'Email',
             maxLength: 100,
         }),
         machinery_type: ReferenceColumn({
